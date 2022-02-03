@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8">
+    <title>Dragon</title>
+    
+<!--
+    
+--------------------------------------------------------------------------------------------------------------------------------------
+                                       
+                                                       ┏━━━┳━━━┳━━━┳━━━┳━━━┳━┓╋┏┓
+                                                       ┗┓┏┓┃┏━┓┃┏━┓┃┏━┓┃┏━┓┃┃┗┓┃┃
+                                                       ╋┃┃┃┃┗━┛┃┃╋┃┃┃╋┗┫┃╋┃┃┏┓┗┛┃
+                                                       ╋┃┃┃┃┏┓┏┫┗━┛┃┃┏━┫┃╋┃┃┃┗┓┃┃
+                                                       ┏┛┗┛┃┃┃┗┫┏━┓┃┗┻━┃┗━┛┃┃╋┃┃┃
+                                                       ┗━━━┻┛┗━┻┛╋┗┻━━━┻━━━┻┛╋┗━┛
+                                                           
+                                            Le but est de nourrir le bébé dragon en évitant les mouettes
+                                                Les boutons directionels font bouger le dragon
+                                                        Jeu fait par Guillaume Vézina
+                                                                TIM 2019
+                                            
+--------------------------------------------------------------------------------------------------------------------------------------
+
+-->
+</head>
+
+<body class="main">
+    
+    <canvas width="637" height="492"></canvas>
+       
+       <script>
+           
+        ///// DÉCLARATION DES VARIABLES /////
+        
+        
+        // Récupérer le canvas
+        let leCanvas = document.querySelector("canvas");
+        let ctx = leCanvas.getContext("2d");
+        
+        // Liste des musiques
+        let musiqueTitre = new Audio("Sons/Musique/Title.mp3");
+        let musiqueJeu_1 = new Audio("Sons/Musique/Musique_1.mp3");
+        let musiqueJeu_2 = new Audio("Sons/Musique/Musique_2.mp3");
+        let musiqueJeu_3 = new Audio("Sons/Musique/Musique_3.mp3");
+        let musiqueJeu_4 = new Audio("Sons/Musique/Musique_4.mp3");
+        let musiqueJeu_5 = new Audio("Sons/Musique/Musique_5.mp3");
+        let musiquePartieGagnee = new Audio("Sons/Musique/Win.mp3");
+        let musiquePartiePerdue = new Audio("Sons/Musique/Lose.mp3");
+        
+        // Liste des effets sonores
+        let sonCollisionMouette = new Audio("Sons/SFX/Slap.mp3");
+        let sonPowerUp = new Audio("Sons/SFX/Powerup.wav")
+        
+        // Index et nom de la chanson
+        let indexChanson = (Math.ceil(Math.random() * 5));
+        let nomChanson;
+        
+        // Index du spritesheet du bébé dragon
+        let indexDragon = 1;
+        
+        // Tableau pour regrouper les mouettes
+        let lesMouettes = [];
+        let lesPowerUp = [];
+        
+        // Permet de détecter la collision de la mouette
+        let collisionMouette = false;
+        
+        // Variables qui détectent le début et la fin d'une partie
+        let gameStart = false;
+        let gameOver = false;
+        
+        //Les positions possibles des mouettes et power up - voir fonction choisirPosYMouetteAuHasard et choisirPosYPowerUpAuHasard
+        let lesPosYMouette = [0, (leCanvas.height - 200) / 2, leCanvas.height - 200];
+        let lesPosYPowerUp = [0, (leCanvas.height - 200) / 2, leCanvas.height - 200];
+        
+        // Appliquer les flèches du clavier à false
+        let fleches =
+            {
+                gauche: false,
+                droite: false,
+                haut: false,
+                bas: false,
+            }
+        
+        
+        // Bébé dragon, personnage controllable
+        let dragon = 
+            {
+                img: new Image(),
+                urlImage: "Images/Personnages/Baby/Dragon_Baby-SpriteSheet_" + indexDragon + "_.png",
+                posX: leCanvas.width / (10/1),
+                posY: leCanvas.height / 3,
+                vitesseX: 5,
+                vitesseY: 5,
+                largeurVignette: 104,
+                hauteurVignette: 124,
+                indexVignette: 0,
+                nbVignette: 5,
+                sX: 0,
+            }
+        
+        // Barre de progression du jeu
+        let barreProgression =
+            {
+                img: new Image(),
+                urlImage: "Images/Objets/Progress_Bar.jpg",
+                posX: 10,
+                posY: leCanvas.height - 50,
+                largeurVignette: 820,
+                hauteurVignette: 1154/6,
+                indexVignette: 0,
+                nbVignette: 6,
+                sY: 0,
+            }
+        
+        // Fond d'écran de jeu
+        let imgFond =
+        {
+            img: new Image(),
+            urlImage: "Images/GIF/Game/Clouds2.png",
+            posX: 0,
+            vitesseX: 100,
+            largeurVignette: 10000,
+            hauteurVignette: 225,
+        }
+        
+        
+        // Déclaration des intervalles des éléments animés
+        let intervalDragon;
+        let intervalMouetteVol;
+        let intervalPowerUp;
+        let intervalImagesMouette;
+           
+           
+        // Charger la source des images
+        dragon.img.src = dragon.urlImage;
+        barreProgression.img.src = barreProgression.urlImage;
+        imgFond.img.src = imgFond.urlImage;
+
+
+        // Image d'intro
+        leCanvas.style.backgroundImage = "url('Images/GIF/Title/Title.gif')";
+        
+        
+        // Mettre les gestionnaires d'événements pour la détection des touches du clavier
+        document.addEventListener("keydown", presserTouche);
+        document.addEventListener("keyup", relacherTouche);
+        
+        // Faire commencer la partie lors d'un click
+        leCanvas.addEventListener("click", debuterJeu);
+           
+           
+        ///// FONCTIONS /////
+        
+
+        // Faire fonctionner le jeu lorsque la partie est commencée
+        function debuterJeu()
+        {
+            // Appliquer la variable qui fait commencer la partie
+            gameStart = true;
+            
+            // Enlever l'option qui permet de cliquer sur le canvas pour faire débuter le jeu
+            leCanvas.removeEventListener("click", debuterJeu);
+            
+            // Effacer l'image d'introduction
+            leCanvas.style.backgroundImage = "none";
+            
+            // Partir les minuteries
+            // Minuterie pour actualiser l'affichage du jeu
+            intervalJeuID = setInterval(actualiserLeJeu, 1000/60);
+            
+            // Minuterie pour faire animer le bébé dragon
+            intervalDragon = setInterval(animerDragon, 1000/10);
+            
+            // Minuterie pour mettre des mouettes à toutes les 1,5 secondes
+            intervalMouetteVol = setInterval(mettreUneMouette, 1000/(3/2));
+            
+            //Minuterie pour changer la mouette
+            intervalImagesMouette = setInterval(changerImageMouette, 1000/12);
+            
+            // Minuterie pour placer un power up varié aléatoirement
+            intervalPowerUp = setInterval(mettreUnPowerUp, 1000/(2.5/10));
+            
+            // Appeler la fonction qui permet de changer la musique du jeu
+            choisirMusiqueAuHasard();
+            
+            // Mettre une première mouette
+            mettreUneMouette();
+            
+            // Mettre un premier power up
+            mettreUnPowerUp();
+        }
+        
+        //Fonction pour actualiser l'affichage du canvas pendant le jeu
+        function actualiserLeJeu()
+        {
+            //Effacer le canvas
+            ctx.clearRect(0, 0, leCanvas.width, leCanvas.height);
+
+            // Appeler la fonction qui permet d'afficher le fond d'écran de jeu
+            afficherFondEcranJeu();
+
+            // Appeler la fonction qui permet d'afficher le bébé dragon
+            afficherDragon();
+            
+            // Appeler la fonction qui permet de déplacer le bébé dragon
+            deplacerDragon();
+            
+            // Appeler la fonction qui permet d'afficher les mouettes
+            afficherLesMouettes();
+            
+            // Appeler la fonction qui permet d'afficher les power up
+            afficherLesPowerUps();
+            
+            // Appeler la fonction qui permet d'afficher la barre de progression
+            afficherBarre();
+
+            // Détecter si le bébé dragon est entré en collision avec une mouette
+            detecterCollisionMouette();
+            
+            // Détecter si le bébé dragon est entré en collision avec un power up
+            detecterCollisionPowerUp();
+        }
+        
+        function afficherFondEcranJeu()
+        {   
+            // Dessiner l'image d'arrière-plan
+            ctx.drawImage(imgFond.img, imgFond.posX, 0, 10000, leCanvas.height);
+            
+            // Faire défiler l'image vers la droite
+            imgFond.posX -= imgFond.vitesseX;
+            
+            // Faire répéter l'image de fond
+            if (imgFond.posX < -5900)
+                {
+                    imgFond.posX = 0;
+                }
+        }
+        
+        // Afficher les poses d'animation du bébé dragon aléatoirement
+        function afficherDragon()
+        {   
+            //Dessiner le bébé dragon
+            ctx.drawImage(dragon.img, dragon.sX, 0, dragon.largeurVignette, dragon.hauteurVignette, dragon.posX, dragon.posY, dragon.largeurVignette/1.5, dragon.hauteurVignette/1.5);
+        }
+        
+        // Permet d'animer le bébé dragon dans sa pose habituelle
+        function animerDragon()
+        { 
+            dragon.indexVignette ++;
+            dragon.sX = dragon.indexVignette * dragon.largeurVignette;
+            
+            // Si l'animation est finie et que l'index du dragon est 1, recommencer l'animation et changer l'indexDragon à 2 et vice-versa.
+            if (dragon.indexVignette == dragon.nbVignette && indexDragon == 1)
+                {
+                    indexDragon = 2;
+                    dragon.img.src = "Images/Personnages/Baby/Dragon_Baby-SpriteSheet_2_.png";
+                    dragon.indexVignette = 0;
+                }
+            
+            else if (dragon.indexVignette == dragon.nbVignette && indexDragon == 2)
+                {
+                    indexDragon = 1;
+                    dragon.img.src = "Images/Personnages/Baby/Dragon_Baby-SpriteSheet_1_.png";
+                    dragon.indexVignette = 0;
+                }
+        }
+
+        // Faire bouger le bébé dragon avec les boutons du clavier
+        function deplacerDragon()
+        {
+            // Flèches du clavier
+            if (fleches.droite)
+            {
+                dragon.posX += dragon.vitesseX;
+            }
+            
+            if (fleches.gauche)
+            {
+                dragon.posX -= dragon.vitesseX;
+            }
+            
+            
+            if (fleches.haut)
+            {
+                dragon.posY -= dragon.vitesseY;
+            }
+            
+            if (fleches.bas)
+            {
+                dragon.posY += dragon.vitesseY;
+            }
+            
+            
+
+            //Empêcher le bébé dragon de quitter les limites de la scène sur l'axe horizontal
+            //Limite gauche
+            if (dragon.posX < 0)
+            {
+                dragon.posX = 0;
+            }
+
+            //Limite droite
+            let posXmax = leCanvas.width - dragon.largeurVignette/1.5;
+            if (dragon.posX > posXmax)
+            {
+                dragon.posX = posXmax;
+            }
+
+            //Empêcher le bébé dragon de quitter les limites de la scène sur l'axe vertical
+            //Limite haut
+            if (dragon.posY < 0)
+            {
+                dragon.posY = 0;
+            }
+
+            //Limite bas
+            let posYmax = leCanvas.height/ (3.4/3) - dragon.hauteurVignette/1.5;
+            if (dragon.posY > posYmax)
+            {
+                dragon.posY = posYmax;
+            }
+        }
+        
+        // Afficher et animer les mouettes
+        function afficherLesMouettes()
+        {
+            for (let uneMouette of lesMouettes)
+            {
+                uneMouette.posX -= uneMouette.vitesseX;
+
+                // Dessiner la mouette
+                ctx.drawImage(uneMouette.img, uneMouette.sX, 0, uneMouette.largeurVignette, uneMouette.hauteurVignette, uneMouette.posX, uneMouette.posY, uneMouette.largeurVignette, uneMouette.hauteurVignette);
+            }
+        }
+           
+           
+        // Afficher et animer les mouettes
+        function changerImageMouette()
+        {
+            for (let uneMouette of lesMouettes)
+            {
+                // Adapter l'animation de la mouette
+                uneMouette.sX = uneMouette.indexVignette * uneMouette.largeurVignette;
+                
+                // Incrémenter la vignette de la mouette
+                uneMouette.indexVignette++;
+                
+                // Répéter l'animation en boucle
+                if (uneMouette.indexVignette == uneMouette.nbVignette)
+                {
+                    uneMouette.indexVignette = 0;
+                }
+                
+            }
+        }
+        
+        // Fonction pour mettre des mouettes
+        function mettreUneMouette() 
+            {
+                let uneMouette =
+                    {
+                        img: new Image(),
+                        urlImage: "Images/Personnages/Seagull/Enemy_Seagull_Fly.png",
+                        posX: leCanvas.width,
+                        posY: choisirPosYMouetteAuHasard(),
+                        vitesseX: 11 - Math.round(Math.random() * 10),
+                        largeurVignette: 78,
+                        hauteurVignette: 76,
+                        indexVignette: 0,
+                        nbVignette: 7,
+                        sX: 0,
+                    }
+                
+                uneMouette.img.src = uneMouette.urlImage;
+                
+                //Mettre cette barre dans le tableau des mouettes
+                lesMouettes.push(uneMouette);
+                    
+            }
+        
+        // Détecte s'il y a une collision entre une des mouettes et le bébé dragon
+        function detecterCollisionMouette()
+        {
+            // On détecte s'il y a une collision entre une des mouettes et le bébé dragon
+            for (let uneMouette of lesMouettes)
+            {
+                // Calcule la position des bordures concernées
+                let bordInferieurMouette = uneMouette.posY + uneMouette.hauteurVignette/2;
+                let bordInferieurDragon = dragon.posY + dragon.hauteurVignette/2;
+                let bordDroitDragon = dragon.posX + dragon.largeurVignette/2;
+                let bordDroitMouette = uneMouette.posX + uneMouette.largeurVignette/2;
+
+                // Sur l'axe des Y on analyse si le bébé dragon touche le bas d'une mouette plus haute que lui...
+                
+                if ((dragon.posY < bordInferieurMouette) &&
+                    (uneMouette.posY < bordInferieurDragon) &&
+                    (bordDroitDragon > uneMouette.posX) &&
+                    (dragon.posX < bordDroitMouette))
+                {
+
+                    // Enregistrer qu'il y a eu une collision
+                    collisionMouette = true;
+
+                    // Faire jouer le son de la collision
+                    sonCollisionMouette.play();
+                    
+                    // Faire activer la fonction de fin de partie
+                    finJeu();
+                }
+                
+                if (uneMouette.posX < 0 - uneMouette.largeurVignette)
+                {
+                    enleverUneMouette(uneMouette);
+                }
+            }
+        }
+        
+        // Fonction qui permet d'enlever une mouette lorsqu'elle est hors de l'écran
+        function enleverUneMouette(uneMouette)
+        {
+            let quelIndexMouette = lesMouettes.indexOf(uneMouette);
+            
+            lesMouettes.splice(quelIndexMouette, 1);
+        }
+        
+        // Fonction pour choisir une position au hasard sur l'axe des Y pour chaque mouette
+        function choisirPosYMouetteAuHasard()
+        {
+            // Dans le tableau des positions on choisit une position au hasard
+            // S'il ne reste plus d'index dans le tableau, on le remplit de nouveau
+            if (lesPosYMouette.length == 0)
+            {
+                lesPosYMouette = [100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350]
+            }
+            
+            // Identifier un index au hasard
+            let indexHasard = Math.floor(Math.random() * lesPosYMouette.length);
+            
+            // Récupérer la valeur à cet index
+            let laPosY = lesPosYMouette[indexHasard];
+
+            // Enlever l'élément à cet index
+            lesPosYMouette.splice(indexHasard, 1);
+
+            // Enfin, retourner la valeur identifiée
+            return laPosY;
+        }
+        
+        // Fonction qui permet de placer un power up au hasard
+        function mettreUnPowerUp()
+        {
+            let powerUp =
+            {
+                img: new Image(),
+                urlImage: "Images/Objets/Food.png",
+                posX: leCanvas.width,
+                posY: choisirPosYPowerUpAuHasard(),
+                vitesseX: 18 - Math.round(Math.random() * 10),
+                largeurVignette: 68,
+                hauteurVignette: 68,
+                indexVignette: Math.floor(Math.random() * 15),
+                sX: 0,
+                estAttrape: false,
+            }
+            
+            powerUp.img.src = powerUp.urlImage;
+ 
+            lesPowerUp.push(powerUp);
+        }
+
+        // Fonction qui permet d'Afficher les power ups sur le canvas
+        function afficherLesPowerUps()
+        {
+            for (let unPowerUp of lesPowerUp)
+            {
+                // Contrôler la vignette du power up
+                unPowerUp.sX = unPowerUp.indexVignette * unPowerUp.largeurVignette;
+                
+                // Contrôler la position X par rapport à sa vitesse
+                unPowerUp.posX -= unPowerUp.vitesseX;
+                
+                // Dessiner les power ups
+                ctx.drawImage(unPowerUp.img, unPowerUp.sX, 0, unPowerUp.largeurVignette, unPowerUp.hauteurVignette, unPowerUp.posX, unPowerUp.posY, unPowerUp.largeurVignette/2, unPowerUp.hauteurVignette/2);
+            }
+        }
+        
+        // Lorsque le bébé dragon intéragit avec la nourriture, il obtient une amélioration lui permettant de cracher des boules de feu à ses adversaires
+        function detecterCollisionPowerUp()
+        {
+            
+            // On détecte s'il y a une collision entre un des power ups et le bébé dragon
+            for (let unPowerUp of lesPowerUp)
+            {
+                // Calcule la position des bordures concernées
+                let bordInferieurPowerUp = unPowerUp.posY + unPowerUp.hauteurVignette/2;
+                let bordInferieurDragon = dragon.posY + dragon.hauteurVignette/2;
+                let bordDroitDragon = dragon.posX + dragon.largeurVignette/2;
+                let bordDroitPowerUp = unPowerUp.posX + unPowerUp.largeurVignette/2;
+
+                
+                // Sur l'axe des Y on analyse si le bébé dragon touche le bas d'un power up plus haut que lui...
+                if ((dragon.posY < bordInferieurPowerUp) &&
+                    (unPowerUp.posY < bordInferieurDragon) &&
+                    (bordDroitDragon > unPowerUp.posX) &&
+                    (dragon.posX < bordDroitPowerUp))
+                {
+                    // Enregistrer qu'il y a eu une collision
+                    unPowerUp.estAttrape = true;
+
+                    // Faire jouer le son de la collision
+                    sonPowerUp.play();
+                }
+                
+                // Si le power up est attrapé, il retourne à true
+                if (unPowerUp.estAttrape == true)
+                {
+                    // Enlever le power up
+                    enleverUnPowerUp(unPowerUp);
+                    
+                    // Incrémenter la barre de progression
+                    barreProgression.indexVignette++;
+                }
+                
+                // Si le power up dépasse le côté gauche du canvas, il disparait
+                if (unPowerUp.posX < 0 - unPowerUp.largeurVignette)
+                {
+                    enleverUnPowerUp(unPowerUp);
+                }
+            }
+        }
+        
+        // Fonction pour enlever les power up lorsqu'ils sont activés
+        function enleverUnPowerUp(unPowerUp)
+        {
+            let quelIndexPowerUp = lesPowerUp.indexOf(unPowerUp);
+            
+            lesPowerUp.splice(quelIndexPowerUp, 1);
+        }
+           
+           // Fonction pour choisir une position au hasard sur l'axe des Y pour chaque power up
+        function choisirPosYPowerUpAuHasard()
+        {
+            // Dans le tableau des positions on choisit une position au hasard
+            // S'il ne reste plus d'index dans le tableau, on le remplit de nouveau
+            if (lesPosYPowerUp.length == 0)
+            {
+                // Les positions Y que peut contenir les Power Up
+                lesPosYPowerUp = [100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350]
+            }
+            
+            // Identifier un index au hasard
+            let indexHasard = Math.floor(Math.random() * lesPosYMouette.length);
+            
+            // Récupérer la valeur à cet index
+            let laPosY = lesPosYPowerUp[indexHasard];
+
+            // Enlever l'élément à cet index
+            lesPosYPowerUp.splice(indexHasard, 1);
+
+            // Enfin, retourner la valeur identifiée
+            return laPosY;
+        }
+        
+        // Permet d'afficher la barre de progression
+        function afficherBarre()
+        {
+            // Animation de la barre
+            barreProgression.sY = barreProgression.indexVignette * barreProgression.hauteurVignette;
+            
+            // Dessiner la barre de progression
+            ctx.drawImage(barreProgression.img, 0, barreProgression.sY, barreProgression.largeurVignette, barreProgression.hauteurVignette, barreProgression.posX, barreProgression.posY, barreProgression.largeurVignette/5, barreProgression.hauteurVignette/5);
+            
+            // Si la barre est complétée, le jeu se termine
+            if (barreProgression.indexVignette == 5)
+                {
+                    finJeu();
+                }
+        }
+        
+        // Lorsqu'une touche est préssée
+        function presserTouche(event)
+        {
+            // Touche Droite
+            if (event.keyCode == 39)
+            {
+                fleches.droite = true;
+            }
+            
+            // Touche Gauche
+            if (event.keyCode == 37) 
+            {
+                fleches.gauche = true;
+            }
+            
+            // Touche Haut
+            if (event.keyCode == 38) 
+            {
+                fleches.haut = true;
+            }
+            
+            // Touche Bas
+            if (event.keyCode == 40) 
+            {
+                fleches.bas = true;
+            }
+        }
+
+
+        // Lorsqu'une touche est relachée
+        function relacherTouche(event)
+        {
+            // Touche Droite
+            if (event.keyCode == 39)
+            {
+                fleches.droite = false;
+            }
+            
+            // Touche Gauche
+            if (event.keyCode == 37)
+            {
+                fleches.gauche = false;
+            }
+            
+            // Touche Haut
+            if (event.keyCode == 38) 
+            {
+                fleches.haut = false;
+            }
+            
+            // Touche Bas
+            if (event.keyCode == 40) 
+            {
+                fleches.bas = false;
+            }
+
+            // Si le jeu n'est pas encore commencé et que la touche ENTER est relâchée on débute la partie
+            if (gameStart == false && event.keyCode == 32)
+            {
+                debuterJeu();
+            }
+            
+            // Si le jeu est terminée et que la touche ENTER est relâchée on recommence le jeu
+            if (gameOver == true && event.keyCode == 32)
+            {
+                document.location.reload();
+            }
+        }
+        
+        // Décider la chanson au hasard
+        function choisirMusiqueAuHasard()
+        {   
+            if (indexChanson == 1)
+                {
+                    musiqueJeu_1.play();
+                    musiqueJeu_1.loop = true;
+                    musiqueJeu_1.volume = 0.2;
+                    nomChanson = "Another Winter (Frozen Suburbs)";
+                }
+            
+            if (indexChanson == 2)
+                {
+                    musiqueJeu_2.play();
+                    musiqueJeu_2.loop = true;
+                    musiqueJeu_2.volume = 0.2;
+                    nomChanson = "Sushi Box (Chengu Gardens)";
+                }
+            
+            if (indexChanson == 3)
+                {
+                    musiqueJeu_3.play();
+                    musiqueJeu_3.loop = true;
+                    musiqueJeu_3.volume = 0.2;
+                    nomChanson = "Twin Dragons (Katayanagi Twins Fight)";
+                }
+            
+            if (indexChanson == 4)
+                {
+                    musiqueJeu_4.play();
+                    musiqueJeu_4.loop = true;
+                    musiqueJeu_4.volume = 0.2;
+                    nomChanson = "Suburban Tram (Transit)";
+                }
+                        
+            if (indexChanson == 5)
+                {
+                    musiqueJeu_5.play();
+                    musiqueJeu_5.loop = true;
+                    musiqueJeu_5.volume = 0.2;
+                    nomChanson = "Rox 300 (Roxanne Richter Fight)";
+                }
+            
+            console.log("Lecture en cours:\n" + nomChanson + "\nScott Pilgrim vs The World - The Game");
+        }
+           
+        // Lorsque la partie est terminée
+        function finJeu()
+        {
+            // Si le joueur a été touché par la mouette, la partie est perdue
+            if (collisionMouette == true)
+                {
+                    partiePerdue();
+                }
+            
+            // Si le joueur a survécu tout au long, la partie est gagnée
+            if (collisionMouette == false)
+                {
+                    partieGagnee();
+                }
+            
+            
+            // Arrêter les minuteries en cours
+            clearInterval(intervalDragon);
+            clearInterval(intervalMouetteVol);
+            clearInterval(intervalPowerUp);
+            clearInterval(intervalJeuID);
+
+            
+            // Effacer le Canvas
+            ctx.clearRect(0, 0, leCanvas.width, leCanvas.height);
+            
+            // Arrêter la musique en cours
+            musiqueJeu_1.pause();
+            musiqueJeu_2.pause();
+            musiqueJeu_3.pause();
+            musiqueJeu_4.pause();
+            musiqueJeu_5.pause();
+            
+            // Appliquer la variable qui fait finir la partie
+            gameOver = true;
+            
+            // Faire recommencer le jeu lors du clic de la souris
+            leCanvas.addEventListener("click", recommencerJeu);
+        }
+        
+        // Lorsque le joueur a perdu la partie
+        function partiePerdue()
+        {      
+            // Activer la trame sonore qui indique que le joueur a perdu
+            musiquePartiePerdue.play();
+            musiquePartiePerdue.volume = 0.2;
+            
+            
+            // Mettre le nom de la chanson dans la console
+            console.log("Lecture en cours:\nThe Dark One (Nega Scott Fight/Ending) \nScott Pilgrim vs The World - The Game");
+            
+            
+            // Appeler la fonction qui affiche l'écran de la mauvaise fin
+            afficherMauvaiseFin();
+        }
+        
+        // Lorsque le joueur a gagné la partie
+        function partieGagnee()
+        {
+            // Activer la trame sonore qui indique que le joueur a gagné
+            musiquePartieGagnee.play();
+            musiquePartieGagnee.volume = 0.2;
+            
+            
+            // Mettre le nom de la chanson dans la console
+            console.log("Lecture en cours:\nJust Like in the Movies (Casa Loma’s Film Set) \nScott Pilgrim vs The World - The Game"); 
+            
+            
+            // Appeler la fonction qui affiche l'écran de la bonne fin
+            afficherBonneFin();
+        }
+        
+        // Afficher le GIF de mauvaise fin
+        function afficherMauvaiseFin()
+        {
+            leCanvas.style.backgroundImage = "url('Images/GIF/Lose/GIF/Lose_Screen_GIF_Boucle.gif')";
+        }
+        
+        // Dessiner le GIF de bonne fin
+        function afficherBonneFin()
+        {
+            leCanvas.style.backgroundImage = "url('Images/GIF/Win/GIF/Vol.gif')";
+        }
+           
+        // Faire recommencer le jeu
+        function recommencerJeu()
+        {
+            document.location.reload();
+        }
+        
+           
+        // Enlever la fonction qui permet de surligner la page
+        document.onselectstart = function () { return false; }
+        
+    </script>
+    
+</body>
+    
+    <!-- Mise en page CSS -->
+    <style type="text/css">
+        
+        *
+        {
+            padding: 0;
+            margin: 0;
+            position: relative;
+        }
+        
+        body
+        {
+            text-align: center;
+            background-color: #21a9e1;
+        }
+        
+        canvas
+        {
+            background-repeat: no-repeat;
+            background-size: contain;
+            border: 5px solid #333333;
+            background-color: black;
+            
+            width: 55%;
+            height: 55%;
+            
+            margin-top: 4vh;
+        }
+        
+    </style>
+
+</html>
